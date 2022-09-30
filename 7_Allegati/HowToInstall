@@ -1,6 +1,17 @@
 Apache Traffic Server
 Installation
 
+Network nat
+Proxy per apt
+Creare un file di configurazione in /etc/apt/apt.conf.d (caricamento sequenziale dei file di configurazione)
+
+sudo nano /etc/apt/apt.conf.d/proxy.conf
+
+Acquire::http::Proxy "http://10.0.2.2:5865";
+Acquire::https::Proxy "http://10.0.2.2:5865";
+
+condivisa altre posizioni --> connetti server smb://10.20.4.85
+
 In questo esempio, Apache Traffic Server service ascolta TCP port 80.
 In questo esempio, Webserver ascolta TCP port 8080(dovrebbe ascoltare su qualsiasi).
 
