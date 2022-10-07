@@ -189,3 +189,11 @@ Alive		30
                       TTL     180
                   End
               End
+
+
+
+
+
+
+Io da client faccio richiesta al rp sulla 80 rp va uscendo con una porta 
+al webserver con porta entra ripsonde al rp | RP fa da tramite tra client webserver lui va a chiedere e non il client
