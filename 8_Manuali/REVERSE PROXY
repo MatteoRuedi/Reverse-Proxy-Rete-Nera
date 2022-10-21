@@ -1,0 +1,80 @@
+
+
+
+						REVERSE PROXY 
+
+Un proxy inverso appare agli utenti esterni come se fosse il server di origine, sebbene non generi il contenuto stesso. Intercetta invece le richieste e, in base alle regole configurate e ai contenuti della sua cache, servirà una copia cache del contenuto richiesto stesso, oppure inoltrerà la richiesta al server di origine, eventualmente memorizzando nella cache il contenuto restituito per utilizzarlo con richieste future.
+
+PREPARAZIONE MACCHINA VIRTUALE
+Scheda 1 nat
+scheda 2 host only
+
+Moba per shell
+
+sudo nano /etc/apt/apt.conf.d/proxy.conf
+
+Acquire::http::Proxy "http://10.0.2.2:5865";
+Acquire::https::Proxy "http://10.0.2.2:5865";
+
+etc/netplan/tab
+sudo netplan apply
+
+APACHE TRAFFIC SERVER COME INSTALLARLO
+sudo apt-get update
+sudo apt-get install trafficserver
+
+COME CONFIGURARLO
+
+All'interno del file records.config bisogna:
+ -Abilitare la memorizzazione nella cache delle richieste HTTP proxy  --> CONFIG proxy.config.http.cache.http INT 1
+ -Abilitare il supporto del proxy inverso                             --> CONFIG proxy.config.reverse_proxy.enabled INT 1
+ -Abilitare se si vuole che Traffic Server serva solo le
+  richieste dai server di origine elencati nelle regole 
+  di mappatura del file remap.config. 
+  Se una richiesta non corrisponde, il browser riceverà un errore.    --> CONFIG proxy.config.url_remap.remap_required INT 1
+ -Abilitare se si vuole mantenere l'intestazione dell'host client
+  in una richiesta durante la rimappature  							  --> CONFIG proxy.config.url_remap.pristine_host_hdr INT 1
+ -Abilitare in modo che ATP si colleghi alla porta desiderata 
+  per il traffico http sia per IPv4 che IPv6 						  --> CONFIG proxy.config.http.server_ports STRING 8080 8080:ipv6
+
+
+All'interno del file remap.config bisogna:
+ -Scrivere le regole di mappatura									  --> map http://ATSIP/ http://SERVERAPACHE/
+ -controllare che il rp ascolti sulla 80                              --> netstat -nl | grep :80
+
+																			 OUTPUT RICHIESTO
+																			tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN
+																			tcp6       0      0 :::80                   :::*                    LISTEN
+
+All'interno del file storage.config bisogna:
+ -Impostare a preferenza la spazio dedicato alla cache                --> /var/cache/trafficserver 500M
+
+
+NOTA BENE: dopo ogni modifica riavviare il servizio
+
+
+GENERARE CERTIFICATO SSL
+ -Generare tramite OpenSSL la chiave privata e il certificato pubblico--> sudo openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -days 365 -out 																				 certificate.pem
+ -Visualizzare il certificato creato  								  --> openssl x509 -text -noout -in certificate.pem
+ -Combinare la chiave e il certificato in un pacchetto PKCS#12 (P12)  --> sudo openssl pkcs12 -inkey key.pem -in certificate.pem -export -out certificate.p12
+ -Convalidare il file P12                                             --> sudo openssl pkcs12 -in certificate.p12 -noout -info
+ -Nota: API Connect supporta solo il file in formato P12 (PKCS12) per il presente certificato. Il file P12 deve contenere la chiave privata, il certificato 		   pubblico dell'autorità di certificazione e tutti i certificati intermedi utilizzati per la firma. Il tuo file P12 può contenere un massimo di 10 
+        certificati intermedi.
+
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+						REVERSE PROXY
+
+
+POUND SERVER COME INSTALLARLO
+sudo apt-get update
+sudo apt-get install pound
+sudo nano /etc/pound/pound.cfg
