@@ -11,6 +11,7 @@ scheda 2 host only
 
 Moba per shell
 
+
 sudo nano /etc/apt/apt.conf.d/proxy.conf
 
 Acquire::http::Proxy "http://10.0.2.2:5865";
@@ -71,10 +72,35 @@ GENERARE CERTIFICATO SSL
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-						REVERSE PROXY
+						REVERSE PROXY POUND
 
 
-POUND SERVER COME INSTALLARLO
-sudo apt-get update
-sudo apt-get install pound
-sudo nano /etc/pound/pound.cfg
+## Minimal sample configuration
+##
+## see pound(8) for details
+
+## NOTE: pound currently only seems to work with non-loopback
+## addresses. This sample therefore will not work until adapted.
+
+Global:
+  User:         "root"
+  Group:        "root"
+  #RootJail     "/chroot/pound"
+
+Backends:
+  - &be
+    Address: 192.168.56.30
+    Port: 8080
+
+# This section must exist, but may be empty.
+HTTPListeners:
+  - Address: 192.168.56.10
+    Port: 80
+    Services:
+      - Backends:
+        - *be
+
+# This section must exist, but may be empty.
+HTTPSListeners:
+
+
