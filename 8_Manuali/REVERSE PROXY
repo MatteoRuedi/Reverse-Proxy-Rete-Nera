@@ -34,18 +34,20 @@ All'interno del file records.config bisogna:
   di mappatura del file remap.config. 
   Se una richiesta non corrisponde, il browser riceverà un errore.    --> CONFIG proxy.config.url_remap.remap_required INT 1
  -Abilitare se si vuole mantenere l'intestazione dell'host client
-  in una richiesta durante la rimappature  							  --> CONFIG proxy.config.url_remap.pristine_host_hdr INT 1
+  in una richiesta durante la rimappature  				--> CONFIG proxy.config.url_remap.pristine_host_hdr INT 1
  -Abilitare in modo che ATP si colleghi alla porta desiderata 
-  per il traffico http sia per IPv4 che IPv6 						  --> CONFIG proxy.config.http.server_ports STRING 8080 8080:ipv6
+  per il traffico http sia per IPv4 che IPv6 				--> CONFIG proxy.config.http.server_ports STRING 8080 8080:ipv6
 
 
 All'interno del file remap.config bisogna:
- -Scrivere le regole di mappatura									  --> map http://ATSIP/ http://SERVERAPACHE/
+ -Scrivere le regole di mappatura						--> map http://ATSIP/ http://SERVERAPACHE/
+                                                                      --> map https://192.168.56.20/ http://192.168.56.30:8080/
+ -Regole mappatura https                                              --> map https://192.168.56.20/ https://192.168.56.30:8080/
  -controllare che il rp ascolti sulla 80                              --> netstat -nl | grep :80
 
-																			 OUTPUT RICHIESTO
-																			tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN
-																			tcp6       0      0 :::80                   :::*                    LISTEN
+										OUTPUT RICHIESTO
+										tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN
+										tcp6       0      0 :::80                   :::*                    LISTEN
 
 All'interno del file storage.config bisogna:
  -Impostare a preferenza la spazio dedicato alla cache                --> /var/cache/trafficserver 500M
@@ -59,8 +61,8 @@ GENERARE CERTIFICATO SSL
  -Visualizzare il certificato creato  								  --> openssl x509 -text -noout -in certificate.pem
  -Combinare la chiave e il certificato in un pacchetto PKCS#12 (P12)  --> sudo openssl pkcs12 -inkey key.pem -in certificate.pem -export -out certificate.p12
  -Convalidare il file P12                                             --> sudo openssl pkcs12 -in certificate.p12 -noout -info
- -Nota: API Connect supporta solo il file in formato P12 (PKCS12) per il presente certificato. Il file P12 deve contenere la chiave privata, il certificato 		   pubblico dell'autorità di certificazione e tutti i certificati intermedi utilizzati per la firma. Il tuo file P12 può contenere un massimo di 10 
-        certificati intermedi.
+ -Nota: API Connect supporta solo il file in formato P12 (PKCS12) per il presente certificato. Il file P12 deve contenere la chiave privata, il certificato 		   pubblico dell'autorità di certificazione e tutti i certificati intermedi utilizzati per la firma. Il tuo file P12 può contenere un 
+                massimo di 10 certificati intermedi.
 
 
 
