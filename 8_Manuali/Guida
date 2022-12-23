@@ -1,0 +1,297 @@
+CONFIGURAZIONE INIZIALE MACCHINA VIRTUALE
+
+-Scheda 1 nat
+ scheda 2 host only
+-Proxy nell'installazione -> http://10.0.2.2:5865
+-Creare un file di configurazione in /etc/apt/apt.conf.d/
+ sudo nano /etc/apt/apt.conf.d/proxy.conf
+ e oiincollare le seguenti due righe
+ Acquire::http::Proxy "http://10.0.2.2:5865";
+ Acquire::https::Proxy "http://10.0.2.2:5865";
+-etc/netplan/tab controllare che sia configurato a modo
+ sudo netplan apply
+-Moba come shell
+ Sessioni --> SSH --> Remote host --> bookmark settings --> session name
+
+INSTALLAZIONE E CONFIGURAZIONE ATP
+
+##Installazione del servizio
+apt-get update
+apt-get install trafficserver
+
+##configurare il records.config file
+sudo nano /etc/trafficserver/records.config
+
+##Inserire o modificare nel file le seguenti righe 
+CONFIG proxy.config.http.cache.http INT 1
+CONFIG proxy.config.reverse_proxy.enabled INT 1
+CONFIG proxy.config.url_remap.remap_required INT 1
+CONFIG proxy.config.url_remap.pristine_host_hdr INT 1
+CONFIG proxy.config.http.server_ports STRING 443:ssl 80
+CONFIG proxy.config.ssl.server.cert.path STRING /etc/trafficserver/certs
+CONFIG proxy.config.ssl.server.private_key.path STRING /etc/trafficserver/keys
+CONFIG proxy.config.ssl.client.verify.server INT 0
+CONFIG proxy.config.ssl.client.CA.cert.filename STRING NULL
+il seguente se non esiste non aggiungere in caso contrario commentare
+#CONFIG proxy.config.ssl.server.cipher_suite
+
+##configurare il remap.config file
+sudo nano /etc/trafficserver/remap.config
+
+##Aggiungere in fondo al file questa riga
+map http://aaaa.com/ http://192.168.56.70:8080/
+map http://bbbb.com/ http://192.168.56.80:8080/
+map https://aaaa.com/ https://192.168.56.70/
+map https://bbbb.com/ https://192.168.56.80/
+
+##configurare il ssl_multicert.config file
+sudo nano /etc/trafficserver/ssl_multicert.config
+
+##Aggiungere in fondo al file questa riga
+dest_ip=* ssl_cert_name=host.pem
+
+##Creare il certificato SSL
+mkdir certificates
+cd certificates
+openssl genrsa 2048 > host.key
+openssl req -new -x509 -nodes -sha256 -days 3650 -key host.key > host.cert
+openssl x509 -noout -fingerprint -text < host.cert > host.info
+cat host.cert host.key > host.pem
+chmod 400 host.key host.pem
+cd /etc/trafficserver
+mkdir {certs,keys}
+chown trafficserver:trafficserver {certs,keys}
+cp ~/certificates/host.key keys/
+cp ~/certificates/host.pem certs/
+chown trafficserver:trafficserver {keys/host.key,certs/host.pem}
+
+##configurare il storage.config file
+sudo nano /etc/trafficserver/storage.config
+
+##Modificare il valore come di seguito
+/var/cache/trafficserver 500M
+
+##configurare il plugin.config file
+sudo nano /etc/trafficserver/plugin.config
+
+##Aggiungere la seguente riga in fondo al file
+stats_over_http.so statistics
+##http://aaaa.com/statistics o traffic_top http://192.168.56.20/statistics nella shell per visualizzare le statistiche
+
+##restartare il servizio
+service trafficserver restart
+
+WEBSERVER
+
+apt-get update
+apt-get install apache2
+
+nano /etc/apache2/ports.conf
+
+Listen 0.0.0.0:8080
+<IfModule ssl_module>
+        Listen 443
+</IfModule>
+<IfModule mod_gnutls.c>
+        Listen 443
+</IfModule>
+
+sudo a2enmod ssl
+sudo service apache2 restart
+sudo mkdir /etc/apache2/ssl
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/apache2/ssl/apache.key -out /etc/apache2/ssl/apache.crt
+sudo nano /etc/apache2/sites-available/default-ssl.conf
+cambiare SSLCertificateFile e SSLCertificateKeyFile
+/etc/apache2/ssl/apache.crt
+/etc/apache2/ssl/apache.key
+sudo a2ensite default-ssl.conf
+sudo service apache2 restart
+
+
+HAPROXY
+
+openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout key.pem -out cert.pem
+sudo mkdir -p /etc/ssl/aaaa.com/
+sudo cp example.com.pem /etc/ssl/aaaa.com/
+sudo certbot certonly --standalone -d aaaa.com --non-interactive --agree-tos --email matteo.rueedi@samtrevano.ch --http-01-port=8888
+mv /etc/ssl/aaaa.com/key.pem /etc/ssl/aaaa.com/cert.pem.key
+
+sudo nano /etc/haproxy/haproxy.cfg
+
+frontend www-https
+        bind *:80
+        bind *:443 ssl crt /etc/ssl/aaaa.com/cert.pem
+        # Redirect HTTP to  HTTPS
+        redirect scheme https code 301 if !{ ssl_fc }
+        #Lets Encrypt Renewal URI Test
+        acl letsencrypt-acl path_beg /.well-known/acme-challenge/
+        use_backend letsencrypt-backend if letsencrypt-acl
+        mode http
+        use_backend server1 if { hdr(host) -i bbbb.com }
+        use_backend server2 if { hdr(host) -i aaaa.com }
+
+backend server1
+        server server1 192.168.56.70:8080
+
+backend server2
+        server server2 192.168.56.80:8080
+listen stats
+        bind :8800
+        stats enable
+        stats uri /
+        stats hide-version
+        stats auth test:test
+        default_backend server1
+
+        # Lets Encrypt Backend
+        backend letsencrypt-backend
+        server letsencrypt 127.0.0.1:8888
+
+#Size of cache in MB
+cache mycache
+    total-max-size 500
+
+service haproxy restart
+
+------------------------------------------------------------------------------------------------di seguito ci sono configurazioni non rilevanti-----------------------
+LOGS 
+
+/var/log/servicename
+tail -f nomeLog
+cat nomeLog
+
+Pound
+software installation
+sudo apt-get install pound
+
+##Under Debian / Ubuntu default file located at /etc/pound/pound.cfg
+
+##mdifica deé config file
+vi /etc/pound/pound.cfg
+
+ListenHTTP
+         Address 202.54.1.5
+         Port    80
+         Service
+                  BackEnd
+                       Address 192.168.1.5
+                       Port    8080
+                  End
+          End
+End
+
+##Chiudere il file e restrtare processo
+/etc/init.d/pound restart
+
+##Per tutte le richieste http/https
+
+ListenHTTP
+          Address 202.54.1.5
+          Port    80
+End
+
+ListenHTTPS
+         Address 202.54.1.5
+         Port    443
+         Cert    "/etc/ssl/local.server.pem"
+End
+Service
+                  BackEnd
+                      Address 192.168.1.5
+                      Port    80
+                  End
+                  BackEnd
+                      Address 192.168.1.6
+                      Port    80
+                  End
+End
+
+##Generare certificato ssl 
+cd /etc/ssl && openssl req -x509 -newkey rsa:1024 -keyout local.server.pem -out local.server.pem -days 365 -nodes
+
+##FILE DI CONF COMPLETO
+## Minimal sample pound.cfg
+##############################
+## global options:
+User		"www-data"
+Group		"www-data"
+#RootJail	"/chroot/pound"
+## Logging: (goes to syslog by default)
+##	0	no logging
+##	1	normal
+##	2	extended
+##	3	Apache-style (common log format)
+LogLevel	1
+## check backend every X secs:
+Alive		30
+## use hardware-accelleration card supported by openssl(1):
+#SSLEngine	""
+
+######################################################################
+## listen, redirect and ... to:
+# Here is a more complex example: assume your static images (GIF/JPEG) are to be served from  a  single  back-end  192.168.0.10.  In
+#       addition,  192.168.0.11  is  to  do  the  hosting for www.myserver.com with URL-based sessions, and 192.168.0.20 (a 1GHz PIII) and
+#       192.168.0.21 (800Mhz Duron) are for all other requests (cookie-based sessions).  The logging will be done by the back-end servers.
+#       The configuration file may look like this:
+              # Main listening ports
+              ListenHTTP
+                  Address 202.54.1.10
+                  Port    80
+                  Client  10
+              End
+              ListenHTTPS
+                  Address 202.54.1.10
+                  Port    443
+                  Cert    "/etc/pound/pound.pem"
+                  Client  20
+              End
+
+              # Image server
+              Service
+                  URL ".*.(jpg|gif)"
+                  BackEnd
+                      Address 192.168.1.10
+                      Port    80
+                  End
+              End
+             # Virtual host www.myserver.com
+              Service
+                  URL         ".*sessid=.*"
+                  HeadRequire "Host:.*www.nixcraft.com.*"
+                  BackEnd
+                      Address 192.168.1.11
+                      Port    80
+                  End
+                  Session
+                      Type    PARM
+                      ID      "sessid"
+                      TTL     120
+                  End
+              End
+
+              # Everybody else
+              Service
+                  BackEnd
+                      Address 192.168.1.20
+                      Port    80
+                      Priority 5
+                  End
+                  BackEnd
+                      Address 192.168.1.21
+                      Port    80
+                      Priority 4
+                  End
+                  Session
+                      Type    COOKIE
+                      ID      "userid"
+                      TTL     180
+                  End
+              End
+
+
+
+
+
+
+Io da client faccio richiesta al rp sulla 80 rp va uscendo con una porta 
+al webserver con porta entra ripsonde al rp | RP fa da tramite tra client webserver lui va a chiedere e non il client
